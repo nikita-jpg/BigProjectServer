@@ -3,6 +3,11 @@ package com.example.tes;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
+import javax.crypto.BadPaddingException;
+import javax.crypto.IllegalBlockSizeException;
+import javax.crypto.NoSuchPaddingException;
+import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
 import java.security.PublicKey;
 
 @RestController
@@ -15,14 +20,14 @@ public class Registration {
         this.work = work;
     }
 
-    @GetMapping("/getPublicKeyForReg")
+    @PostMapping("/getPublicKeyForReg")
     public String getPublicKeyForReg(){
         return work.getPublicKeyForReg();
     }
-    @GetMapping("/regPerson")
-    public String regPerson(@RequestParam(value = "login") String login,@RequestParam(value = "password") String password,
-                            @RequestParam(value = "login") String pKkey){
-        return work.makePerson(login,password,pKkey);
+
+    @PostMapping("/regPerson")
+    public String[] regPerson(@RequestBody String[] arr) throws InvalidKeyException, BadPaddingException, NoSuchAlgorithmException, IllegalBlockSizeException, NoSuchPaddingException {
+        return work.makePerson(arr);
     }
 
 }

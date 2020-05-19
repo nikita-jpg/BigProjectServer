@@ -1,12 +1,16 @@
 package com.example.tes;
+import javax.crypto.*;
 import java.io.Closeable;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.security.InvalidKeyException;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.NoSuchAlgorithmException;
 import java.sql.*;
+import java.util.Arrays;
 import java.util.Base64;
+import java.util.UUID;
 
 
 public class LocalBase implements Closeable {
@@ -15,6 +19,7 @@ public class LocalBase implements Closeable {
 
     private static Connection connection;  // JDBC-соединение для работы с таблицей
     private static final String tableName = "my_table_firsts";
+
 
     LocalBase() {
         try {
@@ -38,25 +43,37 @@ public class LocalBase implements Closeable {
                 "publicKey TEXT," +
                 "privateKey  TEXT,"+
                 "zametkaPuth TEXT,"+
-                "imagePuth TEXT)";
+                "imagePuth TEXT,"+
+                "uuid TEXT,"+
+                "uuidAesKey TEXT)";
         executeUpdate(str);
     }
 
-
-
-    public static synchronized String makePerson(String login,String password,String pkKey){
+    //Возвращаем строку вида Публичный ключ:UUID. UUID Зашифрован
+    public static synchronized String makePerson(String login,String password,String pkKey) throws NoSuchAlgorithmException, NoSuchPaddingException, BadPaddingException, InvalidKeyException, IllegalBlockSizeException {
+        String pkKeyStr = "";
+        String uuidStr = "";
         KeyPair keyPair = generateKeys();
-        String str = "INSERT INTO "+tableName+" (login, password, publicKeyPerson, publicKey, privateKey) \n"
+        SecretKey uuidKey = generateSecretKey();
+        UUID uuid = UUID.randomUUID();
+        //Делаем заспос к БД о создании человека
+        String str = "INSERT INTO "+tableName+" (login, password, publicKeyPerson, publicKey, privateKey, uuid, uuidAesKey) \n"
                 +" VALUES ("+"'"+login+"'"+", "+"'"+password+"'"+", "+"'"+pkKey+"'"+", "
-                +"'"+keyPair.getPublic().toString()+"'"+", " +"'"+keyPair.getPrivate().toString()+"'"+")";
+                +"'"+ Arrays.toString(keyPair.getPublic().getEncoded())+"'"+", " +"'"+Arrays.toString(keyPair.getPrivate().getEncoded())+"'"+","+
+                "'"+uuid.toString()+"'"+", "+"'"+uuidKey.toString()+"'"+")";
         try {
             executeUpdate(str);
         } catch (SQLException throwables) {
             throwables.printStackTrace();
             return "";
         }
-        Base64.Encoder encoder = Base64.getEncoder();
-        return new String(encoder.encode(keyPair.getPublic().getEncoded()), StandardCharsets.UTF_8);
+
+        //Готовим возврат
+        pkKeyStr = Arrays.toString(keyPair.getPublic().getEncoded());
+        uuidStr = encodeUuid(uuidStr,uuidKey);
+
+        return pkKey + ":" + uuidStr;
+
     }
     public static synchronized String getPublKey(String login) throws SQLException {
         String str = "SELECT "+"publicKey "
@@ -91,9 +108,17 @@ public class LocalBase implements Closeable {
 
 
 
+    private static String encodeUuid(String data,SecretKey secretKey) throws NoSuchPaddingException, NoSuchAlgorithmException, InvalidKeyException, BadPaddingException, IllegalBlockSizeException {
+        Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+        cipher.init(Cipher.ENCRYPT_MODE,secretKey);
+        return Arrays.toString(cipher.doFinal(data.getBytes()));
 
-
-
+    }
+    private static SecretKey generateSecretKey() throws NoSuchPaddingException, NoSuchAlgorithmException {
+        KeyGenerator keyGenerator = KeyGenerator.getInstance("AES");
+        SecretKey secretKey = keyGenerator.generateKey();
+        return secretKey;
+    }
     private static KeyPair generateKeys(){
         KeyPair keyPair = null;
         try {
