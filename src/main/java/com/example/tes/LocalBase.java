@@ -1,12 +1,12 @@
 package com.example.tes;
 import javax.crypto.*;
+import javax.crypto.spec.SecretKeySpec;
 import java.io.Closeable;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.security.InvalidKeyException;
-import java.security.KeyPair;
-import java.security.KeyPairGenerator;
-import java.security.NoSuchAlgorithmException;
+import java.security.*;
+import java.security.spec.InvalidKeySpecException;
+import java.security.spec.X509EncodedKeySpec;
 import java.sql.*;
 import java.util.Arrays;
 import java.util.Base64;
@@ -26,8 +26,8 @@ public class LocalBase implements Closeable {
             Class.forName(DB_Driver);
             Connection connection = DriverManager.getConnection(DB_URL);//соединениесБД
             connection.close();// отключение от БД
-            deleteTable();
-            createTable();
+            //deleteTable();
+            //createTable();
         } catch (ClassNotFoundException e) {
             e.printStackTrace();
         } catch (SQLException throwables) {
@@ -37,55 +37,143 @@ public class LocalBase implements Closeable {
     private void createTable() throws SQLException {
         String str = "CREATE TABLE IF NOT EXISTS "+ tableName+"(" +
                 "id BIGINT AUTO_INCREMENT PRIMARY KEY," +
-                "login VARCHAR(255) NOT NULL," +
-                "password VARCHAR(255) NOT NULL," +
-                "publicKeyPerson TEXT," +
-                "publicKey TEXT," +
-                "privateKey  TEXT,"+
-                "zametkaPuth TEXT,"+
-                "imagePuth TEXT,"+
-                "uuid TEXT,"+
-                "uuidAesKey TEXT)";
+                "LOGIN VARCHAR(255) NOT NULL," +
+                "PASSWORD VARCHAR(255) NOT NULL," +
+                "NOTE_PATH TEXT,"+
+                "IMAGE_PATH TEXT,"+
+                "UUID TEXT,"+
+                "UUID_AES_KEY TEXT)";
         executeUpdate(str);
     }
 
     //Возвращаем строку вида Публичный ключ:UUID. UUID Зашифрован
-    public static synchronized String makePerson(String login,String password,String pkKey) throws NoSuchAlgorithmException, NoSuchPaddingException, BadPaddingException, InvalidKeyException, IllegalBlockSizeException {
-        String pkKeyStr = "";
-        String uuidStr = "";
-        KeyPair keyPair = generateKeys();
-        SecretKey uuidKey = generateSecretKey();
-        UUID uuid = UUID.randomUUID();
-        //Делаем заспос к БД о создании человека
-        String str = "INSERT INTO "+tableName+" (login, password, publicKeyPerson, publicKey, privateKey, uuid, uuidAesKey) \n"
-                +" VALUES ("+"'"+login+"'"+", "+"'"+password+"'"+", "+"'"+pkKey+"'"+", "
-                +"'"+ Arrays.toString(keyPair.getPublic().getEncoded())+"'"+", " +"'"+Arrays.toString(keyPair.getPrivate().getEncoded())+"'"+","+
-                "'"+uuid.toString()+"'"+", "+"'"+uuidKey.toString()+"'"+")";
+    public static synchronized String makePerson(String login,String password){
+        String requestCode = "0";
+
+        //Проверяем,занят ли логин
+        String check = "SELECT * FROM " + tableName + " WHERE LOGIN = " +"'"+login+"'";
+        ResultSet resultSet;
         try {
-            executeUpdate(str);
+            resultSet = executeQuery(check);
+            resultSet.last();
+            if(resultSet.getRow() == 0)
+            {
+                requestCode = "1"; //логин свободен
+            }
+            else
+            {
+                requestCode = "2";//Логин занят
+                return requestCode + ":" + "'[]'";
+            }
         } catch (SQLException throwables) {
             throwables.printStackTrace();
-            return "";
+            requestCode = "0";//Сервер не доступен
+            return requestCode + ":" + "'[]'";
         }
 
-        //Готовим возврат
-        pkKeyStr = Arrays.toString(keyPair.getPublic().getEncoded());
-        uuidStr = encodeUuid(uuidStr,uuidKey);
 
-        return pkKey + ":" + uuidStr;
+        //Создаём запись
+        String uuidStr = "";
+        SecretKey uuidKey = null;
+        try
+        {
+            uuidKey = generateSecretKey();
+            UUID uuid = UUID.randomUUID();
+            //Делаем заспос к БД о создании человека
+            String str = "INSERT INTO "+tableName+" (LOGIN, PASSWORD, UUID, UUID_AES_KEY) \n"
+                    +" VALUES ("+"'"+login+"'"+", "+"'"+password+"'"+", "+
+                    "'"+uuid.toString()+"'"+", "+"'"+Arrays.toString(uuidKey.getEncoded())+"'"+")";
 
+            executeUpdate(str);
+
+            //Готовим строку для автоавторизации
+            uuidStr = encodeUuid(uuidStr,uuidKey);
+
+            return "'" + requestCode + ":"  + uuidStr + "'";
+
+        } catch (NoSuchPaddingException e) {
+            e.printStackTrace();
+        } catch (NoSuchAlgorithmException e) {
+            e.printStackTrace();
+        } catch (SQLException throwables) {
+            throwables.printStackTrace();
+        } catch (BadPaddingException e) {
+            e.printStackTrace();
+        } catch (IllegalBlockSizeException e) {
+            e.printStackTrace();
+        } catch (InvalidKeyException e) {
+            e.printStackTrace();
+        }
+
+        return "0,'[]'";
     }
-    public static synchronized String getPublKey(String login) throws SQLException {
-        String str = "SELECT "+"publicKey "
-                +"FROM " + tableName
-                +" WHERE " + "login" + "="+"'"+login+"'";
-        ResultSet resultSet = executeQuery(str);
-        String request = null;
-        if(resultSet.next()) request = resultSet.getString("publicKey");
-        resultSet.close();
-        return request;
-    }
+    public static synchronized String autPerson(String login,String password){
+        String requestCode = "0";
+        String check = "SELECT * FROM " + tableName + " WHERE LOGIN = " +"'"+login+"'"
+                +" AND PASSWORD = " +"'"+password+"'";
+        ResultSet resultSet;
+        try {
+            resultSet = executeQuery(check);
+            resultSet.last();
+            if(resultSet.getRow() != 0)
+            {
+                requestCode = "1"; //Запись найдена
+            }
+            else
+            {
+                requestCode = "-1";//Запись не найдена
+                return "'" + requestCode + ":" + "[]" + "'";
+            }
+        } catch (SQLException throwables) {
+            throwables.printStackTrace();
+            requestCode = "0"; //Cервер не доступен
+            return "'" + requestCode + ":" + "[]" + "'";
+        }
 
+
+        try {
+            //Достаём из базы uuidStr
+            String uuidStr;
+            String query = "SELECT UUID FROM " + tableName + " WHERE login = " +"'"+login+"'";
+            uuidStr = executeQuery(query).getString("uuid");
+
+            //Достаём из базы uuidKey
+            String uuidKey;
+            String query1 = "SELECT UUID_AES_KEY FROM " + tableName + " WHERE login = " +"'"+login+"'";
+
+            query1 = executeQuery(query1).getString(7);
+
+            //Делаем SecretKey из строки
+            String[] byteValues = query1.substring(1, query1.length() - 1).split(",");
+            byte[] bytes = new byte[byteValues.length];
+
+            for (int i=0, len=bytes.length; i<len; i++) {
+                bytes[i] = java.lang.Byte.parseByte(byteValues[i].trim());
+            }
+            SecretKey pkToUuid;
+            KeyFactory factory = KeyFactory.getInstance("AES");
+            pkToUuid =  new SecretKeySpec(bytes, 0, bytes.length, "AES");
+
+            //Шифруем файл для автоавторизации
+            uuidStr = encodeUuid(uuidStr,pkToUuid);
+
+            return "'" + requestCode + ":" + uuidStr + "'";
+        } catch (SQLException throwables) {
+            throwables.printStackTrace();
+        } catch (NoSuchAlgorithmException e) {
+            e.printStackTrace();
+        } catch (InvalidKeyException e) {
+            e.printStackTrace();
+        } catch (NoSuchPaddingException e) {
+            e.printStackTrace();
+        } catch (BadPaddingException e) {
+            e.printStackTrace();
+        } catch (IllegalBlockSizeException e) {
+            e.printStackTrace();
+        }
+
+        return "'0:[]'";
+    }
 
     private static ResultSet executeQuery(String sql) throws SQLException {
         ResultSet resultSet;
@@ -109,6 +197,12 @@ public class LocalBase implements Closeable {
 
 
     private static String encodeUuid(String data,SecretKey secretKey) throws NoSuchPaddingException, NoSuchAlgorithmException, InvalidKeyException, BadPaddingException, IllegalBlockSizeException {
+        Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+        cipher.init(Cipher.ENCRYPT_MODE,secretKey);
+        return Arrays.toString(cipher.doFinal(data.getBytes()));
+
+    }
+    private static String decodeUuid(String data,SecretKey secretKey) throws NoSuchPaddingException, NoSuchAlgorithmException, InvalidKeyException, BadPaddingException, IllegalBlockSizeException {
         Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
         cipher.init(Cipher.ENCRYPT_MODE,secretKey);
         return Arrays.toString(cipher.doFinal(data.getBytes()));
