@@ -134,14 +134,17 @@ public class LocalBase implements Closeable {
         try {
             //Достаём из базы uuidStr
             String uuidStr;
-            String query = "SELECT UUID FROM " + tableName + " WHERE login = " +"'"+login+"'";
-            uuidStr = executeQuery(query).getString("uuid");
+            String query = "SELECT UUID FROM " + tableName + " WHERE LOGIN = " +"'"+login+"'";
+            resultSet = executeQuery(query);
+            resultSet.last();
+            uuidStr = resultSet.getString("UUID");
 
             //Достаём из базы uuidKey
             String uuidKey;
-            String query1 = "SELECT UUID_AES_KEY FROM " + tableName + " WHERE login = " +"'"+login+"'";
-
-            query1 = executeQuery(query1).getString(7);
+            String query1 = "SELECT UUID_AES_KEY FROM " + tableName + " WHERE LOGIN = " +"'"+login+"'";
+            resultSet = executeQuery(query1);
+            resultSet.last();
+            query1 = resultSet.getString("UUID_AES_KEY");
 
             //Делаем SecretKey из строки
             String[] byteValues = query1.substring(1, query1.length() - 1).split(",");
@@ -151,7 +154,7 @@ public class LocalBase implements Closeable {
                 bytes[i] = java.lang.Byte.parseByte(byteValues[i].trim());
             }
             SecretKey pkToUuid;
-            KeyFactory factory = KeyFactory.getInstance("AES");
+            KeyGenerator factory = KeyGenerator.getInstance("AES");
             pkToUuid =  new SecretKeySpec(bytes, 0, bytes.length, "AES");
 
             //Шифруем файл для автоавторизации
