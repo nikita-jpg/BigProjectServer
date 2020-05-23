@@ -1,9 +1,22 @@
 package com.example.tes;
+import org.h2.store.fs.FileUtils;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.UrlResource;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.multipart.MultipartFile;
+
 import javax.crypto.*;
 import javax.crypto.spec.SecretKeySpec;
 import java.io.Closeable;
+import java.io.File;
 import java.io.IOException;
+import java.lang.reflect.Field;
+import java.net.MalformedURLException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.security.*;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.X509EncodedKeySpec;
@@ -19,6 +32,7 @@ public class LocalBase implements Closeable {
 
     private static Connection connection;  // JDBC-соединение для работы с таблицей
     private static final String tableName = "my_table_firsts";
+    private static final String root ="C:\\Users\\Nikita\\Desktop\\root";
 
 
     LocalBase() {
@@ -77,19 +91,24 @@ public class LocalBase implements Closeable {
         SecretKey uuidKey = null;
         try
         {
+
             uuidKey = generateSecretKey();
             UUID uuid = UUID.randomUUID();
+
+            File file = new File(root+"\\"+ uuid.toString());
+            file.mkdir();
             //Делаем заспос к БД о создании человека
-            String str = "INSERT INTO "+tableName+" (LOGIN, PASSWORD, UUID, UUID_AES_KEY) \n"
+            String str = "INSERT INTO "+tableName+" (LOGIN, PASSWORD, UUID, UUID_AES_KEY, NOTE_PATH) \n"
                     +" VALUES ("+"'"+login+"'"+", "+"'"+password+"'"+", "+
-                    "'"+uuid.toString()+"'"+", "+"'"+Arrays.toString(uuidKey.getEncoded())+"'"+")";
+                    "'"+uuid.toString()+"'"+", "+"'"+Arrays.toString(uuidKey.getEncoded())+"'"+", "
+                    +"'"+root+"\\"+ uuid.toString()+"'"+")";
 
             executeUpdate(str);
 
             //Готовим строку для автоавторизации
             uuidStr = encodeUuid(uuidStr,uuidKey);
 
-            return "'" + requestCode + ":"  + uuidStr + "'";
+            return "'" + requestCode + ":"  + uuid.toString() + "'";
 
         } catch (NoSuchPaddingException e) {
             e.printStackTrace();
@@ -158,25 +177,143 @@ public class LocalBase implements Closeable {
             pkToUuid =  new SecretKeySpec(bytes, 0, bytes.length, "AES");
 
             //Шифруем файл для автоавторизации
-            uuidStr = encodeUuid(uuidStr,pkToUuid);
+            //uuidStr = encodeUuid(uuidStr,pkToUuid);
 
             return "'" + requestCode + ":" + uuidStr + "'";
-        } catch (SQLException throwables) {
+        } catch (SQLException | NoSuchAlgorithmException throwables) {
             throwables.printStackTrace();
-        } catch (NoSuchAlgorithmException e) {
-            e.printStackTrace();
-        } catch (InvalidKeyException e) {
-            e.printStackTrace();
-        } catch (NoSuchPaddingException e) {
-            e.printStackTrace();
-        } catch (BadPaddingException e) {
-            e.printStackTrace();
-        } catch (IllegalBlockSizeException e) {
-            e.printStackTrace();
         }
 
         return "'0:[]'";
     }
+    public static synchronized int uploadFile(String auth, MultipartFile file,String fileName){
+        int requestCode = 0;
+        //Проверяем,занят ли логин
+        String check = "SELECT * FROM " + tableName + " WHERE UUID = " +"'"+auth+"'";
+        ResultSet resultSet;
+        try {
+            resultSet = executeQuery(check);
+            resultSet.last();
+            if(resultSet.getRow() != 0)
+            {
+                requestCode = 1; //полтзователь найден
+            }
+            else
+            {
+                requestCode = 0;//плохо
+                return requestCode;
+            }
+        } catch (SQLException throwables) {
+            throwables.printStackTrace();
+            requestCode = 0;//Сервер не доступен
+            return requestCode;
+        }
+
+        try {
+            File dir = new File(resultSet.getString("NOTE_PATH"));
+            //File file1 = new File(dir,file.getName());
+
+            fileName = fileName.replaceAll(":","_");
+            Path filepath = Paths.get(dir.toString(), fileName+".txt");
+            file.transferTo(filepath);
+
+        } catch (SQLException | IOException throwables) {
+            throwables.printStackTrace();
+            return 0;
+        }
+        return 1;
+
+    }
+    public static synchronized String[] getFileNameArr(String auth){
+        String[] request;
+        String[] bad = new String[1];
+        int requestCode = 0;
+        //Проверяем,занят ли логин
+        String check = "SELECT * FROM " + tableName + " WHERE UUID = "+"'"+auth+"'";
+        ResultSet resultSet;
+        try {
+            resultSet = executeQuery(check);
+            resultSet.last();
+            if(resultSet.getRow() != 0)
+            {
+                //bad[0] = "1"; //полтзователь найден
+            }
+            else
+            {
+                bad[0]="0";//плохо
+                return bad;
+            }
+        } catch (SQLException throwables) {
+            throwables.printStackTrace();
+            bad[0]="0";//плохо
+            return bad;
+        }
+
+        try {
+            File dir = new File(resultSet.getString("NOTE_PATH"));
+            //File file1 = new File(dir,file.getName());
+            request = dir.list();
+
+            return request;
+        } catch (SQLException throwables) {
+            throwables.printStackTrace();
+            bad[0]="0";//плохо
+            return bad;
+        }
+    }
+    public static synchronized File downloadFile(String auth, String name){
+        String[] request;
+        String[] bad = new String[1];
+        int requestCode = 0;
+        //Проверяем,занят ли логин
+        String check = "SELECT * FROM " + tableName + " WHERE UUID = " +"'"+auth+"'";
+        ResultSet resultSet;
+        try {
+            resultSet = executeQuery(check);
+            resultSet.last();
+            if(resultSet.getRow() != 0)
+            {
+                //bad[0] = "1"; //полтзователь найден
+            }
+            else
+            {
+                bad[0]="0";//плохо
+                return null;
+            }
+        } catch (SQLException throwables) {
+            throwables.printStackTrace();
+            bad[0]="0";//плохо
+            return null;
+        }
+        try {
+            File dir = new File(resultSet.getString("NOTE_PATH"));
+            name = name.replaceAll(":","_");
+            File file = new File("\\"+name+".txt");
+
+
+                Path path = Paths.get(fileBasePath + fileName);
+                Resource resource = null;
+                try {
+                    resource = new UrlResource(path.toUri());
+                } catch (MalformedURLException e) {
+                    e.printStackTrace();
+                }
+                return ResponseEntity.ok()
+                        .contentType(MediaType.parseMediaType(contentType))
+                        .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + resource.getFilename() + "\"")
+                        .body(resource);
+
+
+
+            return file;
+        } catch (SQLException throwables) {
+            throwables.printStackTrace();
+        }
+        return null;
+    }
+
+
+
 
     private static ResultSet executeQuery(String sql) throws SQLException {
         ResultSet resultSet;
@@ -196,6 +333,8 @@ public class LocalBase implements Closeable {
         connection.close();
         return resultSet;
     };
+
+
 
 
 
