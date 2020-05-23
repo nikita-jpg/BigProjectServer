@@ -49,7 +49,7 @@ public class Communication {
     }
 
     @PostMapping("/downloadFile")
-    public File downloadFile(String auth,String name){
+    public String[] downloadFile(String auth,String name){
         return work.downloadFile(auth,name);
     }
 }

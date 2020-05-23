@@ -1,10 +1,5 @@
 package com.example.tes;
 import org.h2.store.fs.FileUtils;
-import org.springframework.core.io.Resource;
-import org.springframework.core.io.UrlResource;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.multipart.MultipartFile;
 
 import javax.crypto.*;
@@ -13,8 +8,8 @@ import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Field;
-import java.net.MalformedURLException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.*;
@@ -40,8 +35,8 @@ public class LocalBase implements Closeable {
             Class.forName(DB_Driver);
             Connection connection = DriverManager.getConnection(DB_URL);//соединениесБД
             connection.close();// отключение от БД
-            //deleteTable();
-            //createTable();
+            deleteTable();
+            createTable();
         } catch (ClassNotFoundException e) {
             e.printStackTrace();
         } catch (SQLException throwables) {
@@ -261,9 +256,10 @@ public class LocalBase implements Closeable {
             return bad;
         }
     }
-    public static synchronized File downloadFile(String auth, String name){
-        String[] request;
-        String[] bad = new String[1];
+    public static synchronized String[] downloadFile(String auth, String name){
+        String[] request = new String[2];
+        request[0]="1";
+        request[1]="";
         int requestCode = 0;
         //Проверяем,занят ли логин
         String check = "SELECT * FROM " + tableName + " WHERE UUID = " +"'"+auth+"'";
@@ -273,43 +269,28 @@ public class LocalBase implements Closeable {
             resultSet.last();
             if(resultSet.getRow() != 0)
             {
-                //bad[0] = "1"; //полтзователь найден
+                request[0] = "1";
             }
             else
             {
-                bad[0]="0";//плохо
-                return null;
+                request[0]="0";
+                return request;
             }
         } catch (SQLException throwables) {
             throwables.printStackTrace();
-            bad[0]="0";//плохо
-            return null;
+            request[0]="0";
+            return request;
         }
         try {
-            File dir = new File(resultSet.getString("NOTE_PATH"));
-            name = name.replaceAll(":","_");
-            File file = new File("\\"+name+".txt");
 
-
-                Path path = Paths.get(fileBasePath + fileName);
-                Resource resource = null;
-                try {
-                    resource = new UrlResource(path.toUri());
-                } catch (MalformedURLException e) {
-                    e.printStackTrace();
-                }
-                return ResponseEntity.ok()
-                        .contentType(MediaType.parseMediaType(contentType))
-                        .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + resource.getFilename() + "\"")
-                        .body(resource);
-
-
-
-            return file;
-        } catch (SQLException throwables) {
+            byte[] encoded = Files.readAllBytes(Paths.get(resultSet.getString("NOTE_PATH")+"\\"+name));
+            request[1] = name+"|"+new String(encoded, StandardCharsets.US_ASCII);
+            return request;
+        } catch (SQLException | IOException throwables) {
             throwables.printStackTrace();
+            request[0]="0";//плохо
+            return request;
         }
-        return null;
     }
 
 
