@@ -18,6 +18,6 @@ public interface CommunicationWork {
     String regPerson(String login, String password);
     String autPerson(String login,String password);
     String[] getFileNameArr(String auth);
-    int uploadFile(String name, MultipartFile zam,String fileName);
+    int uploadFile(String name, MultipartFile zam, String fileName, byte[] img);
     String[] downloadFile(String auth,String name);
 }

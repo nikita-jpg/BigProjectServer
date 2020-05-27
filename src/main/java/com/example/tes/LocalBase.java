@@ -6,6 +6,7 @@ import javax.crypto.*;
 import javax.crypto.spec.SecretKeySpec;
 import java.io.Closeable;
 import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
@@ -35,8 +36,8 @@ public class LocalBase implements Closeable {
             Class.forName(DB_Driver);
             Connection connection = DriverManager.getConnection(DB_URL);//соединениесБД
             connection.close();// отключение от БД
-            deleteTable();
-            createTable();
+            //deleteTable();
+            //createTable();
         } catch (ClassNotFoundException e) {
             e.printStackTrace();
         } catch (SQLException throwables) {
@@ -181,7 +182,7 @@ public class LocalBase implements Closeable {
 
         return "'0:[]'";
     }
-    public static synchronized int uploadFile(String auth, MultipartFile file,String fileName){
+    public static synchronized int uploadFile(String auth, MultipartFile file, String fileName, String img){
         int requestCode = 0;
         //Проверяем,занят ли логин
         String check = "SELECT * FROM " + tableName + " WHERE UUID = " +"'"+auth+"'";
@@ -209,8 +210,16 @@ public class LocalBase implements Closeable {
             //File file1 = new File(dir,file.getName());
 
             fileName = fileName.replaceAll(":","_");
+            if(img != null) fileName = "I"+fileName;
             Path filepath = Paths.get(dir.toString(), fileName+".txt");
-            file.transferTo(filepath);
+
+            if(img == null)
+                file.transferTo(filepath);
+            else {
+                FileWriter fileWriter = new FileWriter(String.valueOf(filepath));
+                fileWriter.write(img);
+                fileWriter.close();
+            }
 
         } catch (SQLException | IOException throwables) {
             throwables.printStackTrace();

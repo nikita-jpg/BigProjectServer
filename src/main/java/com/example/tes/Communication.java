@@ -1,16 +1,12 @@
 package com.example.tes;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.MediaType;
-import org.springframework.util.FileCopyUtils;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import javax.crypto.BadPaddingException;
 import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.NoSuchPaddingException;
-import javax.servlet.http.HttpServletResponse;
-import java.io.*;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.sql.SQLException;
@@ -36,11 +32,11 @@ public class Communication {
         return work.autPerson(login,password);
     }
 
-    @RequestMapping(value="/uploadFile", method=RequestMethod.POST)
-    public @ResponseBody int handleFileUpload(@RequestParam("foo") String name,
+    @RequestMapping(value="/uploadText", method=RequestMethod.POST)
+    public @ResponseBody int handleFileUpload(@RequestParam("foo") String auth,
                                               @RequestParam("zam") MultipartFile zam,
                                               @RequestParam("fileName") String fileName){
-         return work.uploadFile(name,zam,fileName);
+         return work.uploadFile(auth,zam,fileName,null);
     }
 
     @PostMapping("/getFileNameArr")
@@ -51,5 +47,12 @@ public class Communication {
     @PostMapping("/downloadFile")
     public String[] downloadFile(String auth,String name){
         return work.downloadFile(auth,name);
+    }
+
+    @PostMapping("/uploadImage")
+    public int uploadImage(@RequestParam("auth") String auth,
+                           @RequestParam("fileName") String fileName,
+                           @RequestBody byte[] imgArrByte){
+        return work.uploadFile(auth,null,fileName,imgArrByte);
     }
 }
