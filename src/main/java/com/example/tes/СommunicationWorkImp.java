@@ -26,8 +26,13 @@ public class СommunicationWorkImp implements CommunicationWork {
     }
 
     @Override
-    public String[] downloadFile(String auth, String name) {
+    public String[] downloadText(String auth, String name) {
         return LocalBase.downloadFile(auth,name);
+    }
+
+    @Override
+    public String downloadImage(String auth, String name) {
+        return LocalBase.downloadImage(auth,name);
     }
 
 

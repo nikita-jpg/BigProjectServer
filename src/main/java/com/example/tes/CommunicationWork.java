@@ -19,5 +19,6 @@ public interface CommunicationWork {
     String autPerson(String login,String password);
     String[] getFileNameArr(String auth);
     int uploadFile(String name, MultipartFile zam, String fileName, byte[] img);
-    String[] downloadFile(String auth,String name);
+    String[] downloadText(String auth, String name);
+    String downloadImage(String auth,String name);
 }

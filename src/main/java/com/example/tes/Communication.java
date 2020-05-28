@@ -45,8 +45,13 @@ public class Communication {
     }
 
     @PostMapping("/downloadFile")
-    public String[] downloadFile(String auth,String name){
-        return work.downloadFile(auth,name);
+    public String[] downloadText(String auth, String name){
+        return work.downloadText(auth,name);
+    }
+
+    @PostMapping("/downloadImage")
+    public String downloadImage(String auth,String name){
+        return work.downloadImage(auth,name);
     }
 
     @PostMapping("/uploadImage")

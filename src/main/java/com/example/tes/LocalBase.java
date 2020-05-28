@@ -215,9 +215,15 @@ public class LocalBase implements Closeable {
 
             if(img == null)
                 file.transferTo(filepath);
-            else {
+            else {String[] byteValues = img.substring(1, img.length() - 1).split(",");
+                byte[] bytes = new byte[byteValues.length];
+
+                for (int i=0, len=bytes.length; i<len; i++) {
+                    bytes[i] = Byte.parseByte(byteValues[i].trim());
+                }
+                String str = new String(bytes);
                 FileWriter fileWriter = new FileWriter(String.valueOf(filepath));
-                fileWriter.write(img);
+                fileWriter.write(str);
                 fileWriter.close();
             }
 
@@ -299,6 +305,29 @@ public class LocalBase implements Closeable {
             throwables.printStackTrace();
             request[0]="0";//плохо
             return request;
+        }
+    }
+    public static synchronized String downloadImage(String auth, String name){
+        byte request[] = {};
+        int requestCode = 0;
+        //Проверяем,занят ли логин
+        String check = "SELECT * FROM " + tableName + " WHERE UUID = " +"'"+auth+"'";
+        ResultSet resultSet;
+        try {
+            resultSet = executeQuery(check);
+            resultSet.last();
+            if(resultSet.getRow() == 0)
+                return "request";
+
+        } catch (SQLException throwables) {
+            throwables.printStackTrace();
+            return "request";
+        }
+        try {
+            request = Files.readAllBytes(Paths.get(resultSet.getString("NOTE_PATH")+"\\"+name));
+            return "'"+Arrays.toString(request)+"'";
+        } catch (SQLException | IOException throwables) {
+            return "request";
         }
     }
 
