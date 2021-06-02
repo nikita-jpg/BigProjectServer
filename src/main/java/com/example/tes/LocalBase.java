@@ -1,5 +1,5 @@
 package com.example.tes;
-import org.h2.store.fs.FileUtils;
+//import org.h2.store.fs.FileUtils;
 import org.springframework.web.multipart.MultipartFile;
 
 import javax.crypto.*;
@@ -37,7 +37,7 @@ public class LocalBase implements Closeable {
             Connection connection = DriverManager.getConnection(DB_URL);//соединениесБД
             connection.close();// отключение от БД
             //deleteTable();
-            //createTable();
+            createTable();
         } catch (ClassNotFoundException e) {
             e.printStackTrace();
         } catch (SQLException throwables) {
@@ -192,7 +192,7 @@ public class LocalBase implements Closeable {
             resultSet.last();
             if(resultSet.getRow() != 0)
             {
-                requestCode = 1; //полтзователь найден
+                requestCode = 1; //пользователь найден
             }
             else
             {
