@@ -1,5 +1,5 @@
 # BigProjectServer
-1) Для работы нужна СУБД H2 и драйвер к ней. Драйвер проще всего скачать и https://superuser.com/questions/290999/where-can-i-find-h2-jdbc-driver и добавить в проект 
+1) Для работы нужна СУБД H2 и драйвер к ней. Драйвер проще всего скачать и http://www.h2database.com/automated/h2-latest.jar и добавить в проект 
 File>Project Structure>Libraries>Нажать на + в правом блоке и выбрать путь до скаченного драйвера.
 Внутри класса LocalBase:
     DB_URL = "путь к БД";
